@@ -3,6 +3,8 @@ package com.github.mihalyfodor.wallet.entities;
 import com.google.common.hash.Hashing;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A Blockchain is made up of a chain of blocks. Each block has its own digital
@@ -30,11 +32,6 @@ public class Block {
 	private String previousHash;
 
 	/**
-	 * Data we want to store on the block. Will be coins later :)
-	 */
-	private String data;
-	
-	/**
 	 * Timestamp of when the block was created. Used in generating the digital signature.
 	 */
 	private long timestamp;
@@ -44,10 +41,11 @@ public class Block {
      */
     private int nonce;
 
-	public Block(String data, String previousHash) {
+	private List<Transaction> transactions = new ArrayList<>();
+
+	public Block(String previousHash) {
 		super();
 		this.previousHash = previousHash;
-		this.data = data;
 		this.timestamp = System.currentTimeMillis();
 		this.setHash(calculateHash());
 	}
@@ -55,12 +53,13 @@ public class Block {
 	/**
 	 * One way of generating a digital signature is using a SHA-256 algorithm. Instead of implementing one
 	 * ourselves, we are using the one from google. 
-	 * 
+	 *
 	 * The new signature is based on the previous hash, the data, and the timestamp of the block's creation.
+	 *
+	 * @return
 	 */
 	public String calculateHash() {
-		return Hashing.sha256()
-				.hashString(previousHash + data + timestamp + nonce, StandardCharsets.UTF_8)
+		return Hashing.sha256().hashString(previousHash + transactions.hashCode() + timestamp + nonce, StandardCharsets.UTF_8)
 				.toString();
 	}
 
@@ -106,19 +105,6 @@ public class Block {
 		this.previousHash = previousHash;
 	}
 
-	/**
-	 * @return the data
-	 */
-	public String getData() {
-		return data;
-	}
-
-	/**
-	 * @param data the data to set
-	 */
-	public void setData(String data) {
-		this.data = data;
-	}
 
 	/**
 	 * @return the timestamp
@@ -133,5 +119,16 @@ public class Block {
 	public void setTimestamp(long timestamp) {
 		this.timestamp = timestamp;
 	}
-	
+
+	public boolean isGenesisBlock() {
+	    return previousHash.equals(Constants.GENESIS_HASH);
+    }
+
+    public List<Transaction> getTransactions() {
+        return transactions;
+    }
+
+    public void setTransactions(List<Transaction> transactions) {
+        this.transactions = transactions;
+    }
 }

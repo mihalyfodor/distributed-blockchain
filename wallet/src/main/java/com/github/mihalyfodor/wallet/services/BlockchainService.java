@@ -1,12 +1,19 @@
 package com.github.mihalyfodor.wallet.services;
 
 import com.github.mihalyfodor.wallet.entities.Block;
+import com.github.mihalyfodor.wallet.entities.Blockchain;
+import com.github.mihalyfodor.wallet.entities.Constants;
+import com.github.mihalyfodor.wallet.entities.Transaction;
+import com.github.mihalyfodor.wallet.entities.TransactionOutput;
+import com.github.mihalyfodor.wallet.entities.Wallet;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.annotation.SessionScope;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
+import java.util.Map;
 
 /**
  * Service for operations on our blockchain.
@@ -24,32 +31,52 @@ import java.util.Random;
 @SessionScope
 public class BlockchainService {
 
-	private List<Block> blockchain = new ArrayList<Block>();
-	
-	/**
+    private WalletService walletService;
+    private TransactionService transactionService;
+
+    private Blockchain blockchain = new Blockchain();
+
+    private Map<String,  Wallet> wallets = new HashMap<>();
+
+    public BlockchainService(WalletService walletService, TransactionService transactionService) {
+        this.walletService = walletService;
+        this.transactionService = transactionService;
+    }
+
+    /**
 	 * Initialize the chain with a genesis block.
 	 */
 	private void initializeChain() {
-		blockchain.add(new Block("Genesis Block", "0"));
+		blockchain.getBlocks().add(new Block( "0"));
 	}
+
+	private void initializeWallets() {
+        wallets.put(Constants.ALICE, new Wallet(Constants.ALICE));
+        wallets.put(Constants.BOB, new Wallet(Constants.BOB));
+        wallets.put(Constants.BANK, new Wallet(Constants.BANK));
+    }
+
+    /**
+     * Create the very first transaction. We need to set most of the fields manually
+     * - create the transaction itself
+     * - create the single output (we are creating money from nothing)
+     * - create the block for it
+     */
+    private void addOriginTransaction(String targetAddress, int coins) {
+
+        Transaction genesisTransaction = new Transaction(wallets.get(Constants.BANK).getAddress(), targetAddress, coins, new ArrayList<>());
+        genesisTransaction.generateSignature();
+        genesisTransaction.setTransactionId(Constants.GENESIS_HASH);
+
+        TransactionOutput genesisOutput = new TransactionOutput(genesisTransaction.getRecipient(), genesisTransaction.getValue(), genesisTransaction.getTransactionId());
+        genesisTransaction.getOutputs().add(genesisOutput);
+        blockchain.getUnspentTransactionOutputs().put(genesisOutput.getId(), genesisOutput);
+
+        Block genesisBlock = new Block(Constants.GENESIS_HASH);
+        genesisBlock.getTransactions().add(genesisTransaction);
+        blockchain.getBlocks().add(genesisBlock);
+    }
 	
-	/**
-	 * Add a block to the chain with the given data. Will only work if the chain is not empty.
-	 * 
-	 * @param data data to add
-	 */
-	public void addBlock(String data) {
-		if (!blockchain.isEmpty()) {
-			Block prevBlock = blockchain.get(blockchain.size() - 1);
-			Block newBlock = new Block(data, prevBlock.getHash());
-			blockchain.add(newBlock);
-
-			// we are also making the system work for it a bit
-			newBlock.mineBlock();
-		}
-	}
-
-
     /**
      * Validate the chain. If we have just the genesis block, that is valid. Otherwise we
      * traverse the chain with two variables, and compare the hashes as follows:
@@ -61,13 +88,13 @@ public class BlockchainService {
      */
     public Boolean isChainValid() {
 
-        if (blockchain.size() <= 1) {
+        if (blockchain.getBlocks().size() <= 1) {
             return true;
         }
 
         Block prevBlock = null;
 
-        for (Block currentBlock : blockchain) {
+        for (Block currentBlock : blockchain.getBlocks()) {
 
             // skip testing the genesis block, we have no prevBlock in this case
             if (prevBlock == null) {
@@ -94,16 +121,39 @@ public class BlockchainService {
         return true;
     }
 
+
 	public List<Block> getBlockchain() {
-	    if (blockchain.isEmpty()) {
+	    if (blockchain.getBlocks().isEmpty()) {
 	        initializeChain();
+            initializeWallets();
+            addOriginTransaction(Constants.ALICE, 100);
         }
-		return blockchain;
+		return blockchain.getBlocks();
 	}
 
+	public Collection<Wallet> getWallets() {
+        wallets.values().forEach(e -> walletService.updateTransactionOutputs(e, blockchain.getUnspentTransactionOutputs().values()));
+        return wallets.values();
+    }
+
 	public void hackBlockchain() {
-	    int number = new Random().nextInt(blockchain.size());
-	    blockchain.get(number).setData("hacked");
+        blockchain.getUnspentTransactionOutputs()
+                .values()
+                .stream()
+                .filter(e -> e.getRecipient().equals("Bob"))
+                .forEach(e -> e.setValue(e.getValue() * 10));
+    }
+
+    public boolean sendMoney(String from, String to, Integer amount) {
+        Block lastBlock = blockchain.getBlocks().get(blockchain.getBlocks().size() - 1);
+        Block newBlock = new Block(lastBlock.getHash());
+        Transaction tx = walletService.createTransaction(wallets.get(from), blockchain, to, amount);
+        boolean txSuccesful = transactionService.addTransaction(blockchain, newBlock, tx);
+        if (txSuccesful) {
+            blockchain.getBlocks().add(newBlock);
+            return true;
+        }
+        return false;
     }
 
 }
