@@ -14,6 +14,11 @@ import java.nio.charset.StandardCharsets;
  */
 public class Block {
 
+    /**
+     * Leading zeroes used for verifying proof of work.
+     */
+    public static String LEADING_ZEROES = "00000";
+
 	/**
 	 * Digital signature of the block.
 	 */
@@ -34,6 +39,11 @@ public class Block {
 	 */
 	private long timestamp;
 
+    /**
+     * Small flag we use to generate a different hash when mining.
+     */
+    private int nonce;
+
 	public Block(String data, String previousHash) {
 		super();
 		this.previousHash = previousHash;
@@ -47,14 +57,26 @@ public class Block {
 	 * ourselves, we are using the one from google. 
 	 * 
 	 * The new signature is based on the previous hash, the data, and the timestamp of the block's creation.
-	 * 
-	 * @return
 	 */
 	public String calculateHash() {
 		return Hashing.sha256()
-				.hashString(previousHash + data + timestamp, StandardCharsets.UTF_8)
+				.hashString(previousHash + data + timestamp + nonce, StandardCharsets.UTF_8)
 				.toString();
 	}
+
+    /**
+     * Mining a Block using Proof of Work.
+     *
+     * Essentially proof of work is solving a problem to create a new block. We can understand that as
+     * generating a new hashcode, still based on the basic fields, until we get one that has a given
+     * number of leading zeroes.
+     */
+    public void mineBlock() {
+        while(!hash.substring( 0, LEADING_ZEROES.length()).equals(LEADING_ZEROES)) {
+            nonce++;
+            hash = calculateHash();
+        }
+    }
 	
 	/**
 	 * @return the hash
