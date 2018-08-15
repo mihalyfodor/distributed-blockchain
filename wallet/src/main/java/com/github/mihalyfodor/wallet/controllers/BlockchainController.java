@@ -3,6 +3,7 @@ package com.github.mihalyfodor.wallet.controllers;
 import com.github.mihalyfodor.wallet.entities.Wallet;
 import com.github.mihalyfodor.wallet.services.BlockchainService;
 import com.github.mihalyfodor.wallet.entities.Block;
+import com.github.mihalyfodor.wallet.services.RegistryService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,9 +20,11 @@ import java.util.List;
 public class BlockchainController {
 
     private BlockchainService blockchainService;
+    private RegistryService registryService;
 
-    public BlockchainController(BlockchainService blockchainService) {
+    public BlockchainController(BlockchainService blockchainService, RegistryService registryService) {
         this.blockchainService = blockchainService;
+        this.registryService = registryService;
     }
 
     @GetMapping("blockchain")
@@ -51,6 +54,11 @@ public class BlockchainController {
     @GetMapping("all")
     public Collection<Wallet> getWallets() {
         return blockchainService.getWallets();
+    }
+
+    @PostMapping("login")
+    public void login() {
+        registryService.login();
     }
 
 
