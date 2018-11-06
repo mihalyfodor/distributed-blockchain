@@ -58,7 +58,7 @@ public class BlockchainController {
 
     @PostMapping("login")
     public void login() {
-        registryService.login();
+//        registryService.login();
     }
 
 
